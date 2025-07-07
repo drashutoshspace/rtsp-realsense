@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# CONFIGURATION
+# Configuration: pick device from argument or auto-detect
 if [ -n "$1" ]; then
   VIDEO_DEVICE="$1"
 else
@@ -14,23 +14,22 @@ else
   fi
 fi
 
-# Activate Python venv (optional)
-source ~/librealsense/venv/bin/activate
+INPUT_FORMAT="yuyv422"
+WIDTH=1280
+HEIGHT=720
+FPS=15
+BITRATE=3000k
 
-# RTSP Configuration
+# Activate Python venv if present
+source ~/librealsense/venv/bin/activate 2>/dev/null || :
+
+# RTSP URL configuration
 HOST_IP=$(hostname -I | awk '{print $1}')
-DEFAULT_RTSP_URL="rtsp://publisher:s3cr3t@${HOST_IP}:8554/realsense"
+DEFAULT_RTSP_URL="rtsp://${HOST_IP}:8554/realsense"
 RTSP_URL=${2:-$DEFAULT_RTSP_URL}
 
-# Video parameters (tune for performance)
-WIDTH=1280       # Lower resolution to reduce bandwidth and decoding errors
-HEIGHT=720
-FPS=15           # Lower frame rate is more stable on weaker networks
-BITRATE=3000k    # Reasonable bitrate for 720p30 (use 5000k+ for 1080p)
-
-# Ensure rtsp-simple-server is running
-if ! pgrep -f "rtsp-simple-server" >/dev/null; then
-  echo "Starting rtsp-simple-server service..."
+# Start RTSP server if needed
+if ! pgrep -f "mediamtx" >/dev/null && ! pgrep -f "rtsp-simple-server" >/dev/null; then
   sudo systemctl start rtsp-simple-server
   sleep 2
 fi
@@ -41,14 +40,16 @@ if [ ! -c "$VIDEO_DEVICE" ]; then
   exit 1
 fi
 
-echo "Streaming $VIDEO_DEVICE → $RTSP_URL"
-echo "Resolution: ${WIDTH}x${HEIGHT} @ ${FPS} FPS, Bitrate: $BITRATE"
+echo "Streaming from $VIDEO_DEVICE to $RTSP_URL"
+echo "Resolution: ${WIDTH}x${HEIGHT} @ ${FPS} FPS"
+echo "Bitrate: $BITRATE, Format: $INPUT_FORMAT"
 echo "Press Ctrl+C to stop."
 
-# FFmpeg RTSP Streaming
+# FFmpeg RTSP Streaming with pixel-format conversion and Annex B bitstream filter
 ffmpeg \
   -hide_banner -loglevel warning \
-  -f v4l2 -input_format yuyv422 -video_size ${WIDTH}x${HEIGHT} -framerate ${FPS} -i "$VIDEO_DEVICE" \
-  -fflags nobuffer -analyzeduration 0 -probesize 32 \
-  -c:v libx264 -preset ultrafast -tune zerolatency -g $((FPS*2)) -b:v $BITRATE \
-  -f rtsp -rtsp_transport tcp "$RTSP_URL"
+  -f v4l2 -input_format ${INPUT_FORMAT} -video_size ${WIDTH}x${HEIGHT} -framerate ${FPS} -i "${VIDEO_DEVICE}" \
+  -pix_fmt yuv420p \
+  -c:v libx264 -preset ultrafast -tune zerolatency -g $((FPS*2)) -b:v ${BITRATE} \
+  -bsf:v h264_mp4toannexb \
+  -f rtsp -rtsp_transport tcp "${RTSP_URL}"
