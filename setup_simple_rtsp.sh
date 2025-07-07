@@ -1,50 +1,60 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-echo "🎞️ Installing FFmpeg..."
-sudo apt update
-sudo apt install -y ffmpeg
+echo "Installing dependencies: curl, tar, ffmpeg, v4l-utils..."
+sudo apt-get update
+sudo apt-get install -y curl tar ffmpeg v4l-utils
 
-# CONFIGURATION
+# Setup variables
 VERSION="v1.13.0"
-FILENAME="mediamtx_${VERSION}_linux_amd64.tar.gz"
-URL="https://github.com/bluenviron/mediamtx/releases/download/${VERSION}/${FILENAME}"
+INSTALL_DIR="/usr/local/bin"
+CONFIG_DIR="/etc/mediamtx"
+SERVICE_FILE="/etc/systemd/system/rtsp-simple-server.service"
 
-echo "📦 Downloading mediamtx $VERSION ..."
-wget -q --show-progress "$URL"
+echo "Downloading and installing MediaMTX (rtsp-simple-server)..."
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+curl -L -o mediamtx.tar.gz "https://github.com/bluenviron/mediamtx/releases/download/${VERSION}/mediamtx_${VERSION}_linux_amd64.tar.gz"
+tar -xzf mediamtx.tar.gz
+sudo mv mediamtx "${INSTALL_DIR}/mediamtx"
+sudo chmod +x "${INSTALL_DIR}/mediamtx"
 
-echo "📂 Extracting..."
-tar -xzf "$FILENAME"
+echo "Creating config directory at $CONFIG_DIR"
+sudo mkdir -p "$CONFIG_DIR"
 
-echo "🚚 Installing mediamtx to /usr/local/bin ..."
-sudo mv mediamtx /usr/local/bin/
-sudo chmod +x /usr/local/bin/mediamtx
+echo "Writing MediaMTX configuration to $CONFIG_DIR/mediamtx.yml"
+cat <<EOF | sudo tee "${CONFIG_DIR}/mediamtx.yml" > /dev/null
+logLevel: info
 
-echo "🧹 Cleaning up..."
-rm "$FILENAME"
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [udp, multicast, tcp]
+rtspEncryption: "no"
 
-echo "🛠️ Creating systemd service for rtsp-simple-server..."
+paths:
+  all:
+    source: publisher
+EOF
 
-sudo tee /etc/systemd/system/rtsp-simple-server.service > /dev/null <<EOF
+echo "Writing systemd service file to $SERVICE_FILE"
+cat <<EOF | sudo tee "$SERVICE_FILE" > /dev/null
 [Unit]
 Description=RTSP Simple Server (mediamtx)
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/mediamtx
+ExecStart=${INSTALL_DIR}/mediamtx ${CONFIG_DIR}/mediamtx.yml
 Restart=on-failure
 User=root
-WorkingDirectory=/usr/local/bin
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo "🔄 Reloading systemd and enabling service..."
+echo "Reloading systemd and enabling rtsp-simple-server..."
 sudo systemctl daemon-reload
 sudo systemctl enable rtsp-simple-server
-sudo systemctl start rtsp-simple-server
+sudo systemctl restart rtsp-simple-server
 
-echo "✅ mediamtx and FFmpeg installed and running!"
-ffmpeg -version
+echo "RTSP Simple Server setup complete."
 sudo systemctl status rtsp-simple-server --no-pager
