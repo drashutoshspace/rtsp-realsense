@@ -1,0 +1,12 @@
+Usage: rtsp-simple-server [<confpath>] [flags]
+
+MediaMTX v1.12.3
+
+Arguments:
+  [<confpath>]    path to a config file. The default is mediamtx.yml.
+
+Flags:
+  -h, --help       Show context-sensitive help.
+      --version    print version
+
+rtsp-simple-server: error: unknown flag -c, did you mean "-h"?
