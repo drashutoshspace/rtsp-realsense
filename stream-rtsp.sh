@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 set -e
 
-# Configuration: pick device from argument or auto-detect
+# Configuration: pick device from argument or auto-detect RGB-compatible RealSense stream
 if [ -n "$1" ]; then
   VIDEO_DEVICE="$1"
 else
-  DEVICE=$(v4l2-ctl --list-devices | awk '/Intel RealSense D435I/{getline; print $1; exit}')
+  # Try to auto-select first RealSense video device supporting RGB-compatible format
+  DEVICE=$(for dev in /dev/video{4..9}; do
+    if v4l2-ctl -d "$dev" --list-formats | grep -E 'YUYV|MJPG|RGB3' >/dev/null; then
+      echo "$dev"
+      break
+    fi
+  done)
+
   if [ -n "$DEVICE" ]; then
     VIDEO_DEVICE="$DEVICE"
   else
-    echo "Warning: Could not auto-detect RealSense device; defaulting to /dev/video4"
+    echo "Warning: Could not auto-detect RealSense RGB camera; defaulting to /dev/video4"
     VIDEO_DEVICE="/dev/video4"
   fi
 fi
@@ -28,7 +35,7 @@ HOST_IP=$(hostname -I | awk '{print $1}')
 DEFAULT_RTSP_URL="rtsp://${HOST_IP}:8554/realsense"
 RTSP_URL=${2:-$DEFAULT_RTSP_URL}
 
-# Start RTSP server if needed
+# Start RTSP server if not already running
 if ! pgrep -f "mediamtx" >/dev/null && ! pgrep -f "rtsp-simple-server" >/dev/null; then
   sudo systemctl start rtsp-simple-server
   sleep 2
