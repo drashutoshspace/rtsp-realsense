@@ -2,7 +2,7 @@
 set -e -o pipefail
 
 sudo apt-get update && sudo apt-get upgrade
-sudo apt-get install libssl-dev libusb-1.0-0-dev libudev-dev pkg-config libgtk-3-dev git wget cmake build-essential python3 python3-dev  libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev python3-pybind11 python3-venv at
+sudo apt-get install libssl-dev libusb-1.0-0-dev libudev-dev pkg-config libgtk-3-dev git wget cmake build-essential python3 python3-dev  libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev python3-pybind11 python3-venv
 git clone https://github.com/IntelRealSense/librealsense.git ~/librealsense
 
 ## BUILD
