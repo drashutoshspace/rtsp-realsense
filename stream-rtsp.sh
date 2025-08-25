@@ -53,8 +53,10 @@ fi
 echo "🚀 Streaming from $SELECTED_DEVICE → $RTSP_URL"
 ffmpeg \
   -hide_banner \
-  -f v4l2 -input_format ${INPUT_FORMAT} -video_size ${WIDTH}x${HEIGHT} -framerate ${FPS} -i "${SELECTED_DEVICE}" \
+  -f v4l2 -input_format "${INPUT_FORMAT}" -video_size "${WIDTH}x${HEIGHT}" -framerate "${FPS}" -i "${SELECTED_DEVICE}" \
+  -vf "hflip,vflip" \
   -pix_fmt yuv420p \
-  -c:v libx264 -preset ultrafast -tune zerolatency -g $((FPS*2)) -b:v ${BITRATE} \
+  -c:v libx264 -preset ultrafast -tune zerolatency -g $((FPS*2)) -b:v "${BITRATE}" \
   -bsf:v h264_mp4toannexb \
   -f rtsp -rtsp_transport tcp "${RTSP_URL}"
+
