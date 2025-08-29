@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Auto-get the primary hostname IP
-HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+HOST_IP="$(hostname -I 2>/dev/null | awk '{print $2}')"
 PORT=8554
 FPS=30
 
@@ -39,7 +39,8 @@ done
 echo
 echo "✅ Streams running:"
 for j in $(seq 0 $((i-1))); do
-    echo "  rtsp://${HOST_IP}:${PORT}/fisheye_${j}"
+    # echo "  rtsp://${HOST_IP}:${PORT}/fisheye_${j}"
+    echo "Run 'gst-launch-1.0 rtspsrc location=rtsp://${HOST_IP}:${PORT}/fisheye_${j} latency=0 ! rtph264depay ! h264parse ! avdec_h264 ! autovideosink sync=false'"
 done
 echo "Press Ctrl+C to stop."
 wait
